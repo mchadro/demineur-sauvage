@@ -826,7 +826,7 @@ function tick(){
   fctx.clearRect(0, 0, FW, FH);
   let n = 0;
   while (pending.length && n < 3 && actors.length < CAP){ spawnEscape(pending.shift()); n++; }
-  const br = field.getBoundingClientRect(), ox = br.left / PX, oy = br.top / PX;
+  const br = field.getBoundingClientRect(), ox = br.left / PX, oy = br.top / PX, bw = br.width / PX, bh = br.height / PX;
   const keep = [];
   for (const a of actors){
     if (a.wait > 0){ a.wait--; keep.push(a); continue; }
@@ -845,25 +845,34 @@ function tick(){
         a.x += a.vx + Math.sin(t * .09 + a.ph) * .6; a.y += a.vy; frame = (t / 7 | 0) % 2;
       }
       if (a.x < -30 || a.x > FW + 30 || a.y < -30 || a.y > FH + 30) continue;
+    } else if (a.mode === 'arrive'){
+      const tx = ox + a.rx, ty = oy + a.ry;
+      const dx = tx - a.x, dy = ty - a.y, dist = Math.hypot(dx, dy), step = (d.speed || .9) * 1.1;
+      if (dist <= step){ a.mode = 'party'; a.px = a.rx; a.py = a.ry; a.idle = 30 + Math.random() * 90 | 0; }
+      else { a.x += dx / dist * step; a.y += dy / dist * step; if (Math.abs(dx) > 1) a.dir = Math.sign(dx); }
+      frame = (t / (d.kind === 'walk' ? 7 : 5) | 0) % 2;
     } else {
-      const tx = ox + a.rx + a.wx, ty = oy + a.ry;
-      if (a.mode === 'arrive'){
-        const dx = tx - a.x, dy = ty - a.y, dist = Math.hypot(dx, dy), step = (d.speed || .9) * 1.3;
-        if (dist <= step){ a.mode = 'party'; a.x = tx; a.y = ty; }
-        else { a.x += dx / dist * step; a.y += dy / dist * step; if (Math.abs(dx) > 1) a.dir = Math.sign(dx); }
-        if (d.kind === 'walk') yOff = -Math.abs(Math.sin(t * d.rate)) * d.hop;
-        frame = (t / (d.kind === 'walk' ? 6 : 5) | 0) % 2;
-      } else if (d.kind === 'walk'){
-        if (--a.wt <= 0){ const nw = (Math.random() - .5) * 18; a.dir = nw > a.wx ? 1 : -1; a.wx = nw; a.wt = 50 + Math.random() * 90; }
-        a.x += (tx - a.x) * .05; a.y = ty;
-        yOff = -Math.abs(Math.sin(t * d.rate * 1.3 + a.ph)) * (d.hop + 4);
-        frame = (t / 8 | 0) % 2;
+      /* Promenade dans la forêt : marche lente vers un point du champ, pause, puis nouveau point */
+      const flying = d.kind !== 'walk';
+      if (a.idle > 0){
+        a.idle--;
+        frame = flying ? (t / (d.kind === 'fly' ? 5 : 8) | 0) % 2 : 0;
       } else {
-        const R = d.kind === 'fly' ? 14 : 8, w = d.kind === 'fly' ? .045 : .03;
-        const nx = tx + Math.cos(t * w + a.ph) * R, ny = ty + Math.sin(t * w * 1.7 + a.ph) * R * .6;
-        a.dir = nx >= a.x ? 1 : -1; a.x = nx; a.y = ny;
-        frame = (t / (d.kind === 'fly' ? 5 : 7) | 0) % 2;
+        const dx = a.rx - a.px, dy = a.ry - a.py, dist = Math.hypot(dx, dy);
+        const sp = d.kind === 'walk' ? .2 + d.speed * .08 : d.kind === 'fly' ? .45 : .3;
+        if (dist <= sp){
+          a.px = a.rx; a.py = a.ry;
+          a.idle = (flying ? 20 : 60) + Math.random() * 160 | 0;
+          a.rx = Math.max(0, Math.min(bw, a.px + (Math.random() - .5) * 90));
+          a.ry = flying ? Math.random() * bh : Math.max(bh * .12, Math.min(bh, a.py + (Math.random() - .5) * 50));
+        } else {
+          a.px += dx / dist * sp; a.py += dy / dist * sp;
+          if (Math.abs(dx) > 2) a.dir = Math.sign(dx);
+        }
+        frame = (t / (d.kind === 'walk' ? 12 : d.kind === 'fly' ? 5 : 8) | 0) % 2;
       }
+      a.x = ox + a.px; a.y = oy + a.py;
+      if (flying) yOff = Math.round(Math.sin(t * .05 + a.ph) * 1.5);
     }
     const img = a.set[frame][a.dir < 0 ? 1 : 0];
     fctx.drawImage(img, Math.round(a.x - img.width / 2), Math.round(a.y - img.height + yOff));
