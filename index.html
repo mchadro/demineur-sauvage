@@ -601,7 +601,7 @@ function aggregate(games){
     let p = m.get(key);
     if (!p){ p = {key, name: g.player.trim(), played: 0, won: 0, wins: [], sumAll: 0, last: ''}; m.set(key, p); }
     p.played++; p.sumAll += g.ms;
-    if (g.won) p.wins.push({ms: g.ms, at});
+    if (g.won){ p.won++; p.wins.push({ms: g.ms, at}); }
     if (at >= p.last){ p.last = at; p.name = g.player.trim(); }
   }
   for (const p of m.values()){
